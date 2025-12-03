@@ -25,6 +25,8 @@ app.use(express.static(path.join(__dirname, "public")));
 app.use("/projects", projectsRouter);
 app.use("/users", usersRouter);
 app.use("/subscriptions", subscriptionsRouter);
+app.use("/tools", require("./routes/tools"));
+
 
 // catch 404 and forward to error handler
 app.use(function (req, res, next) {

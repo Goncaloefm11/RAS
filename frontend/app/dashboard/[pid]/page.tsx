@@ -32,14 +32,16 @@ import { ModeToggle } from "@/components/project-page/mode-toggle";
 import { SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
 import { useIsMobile } from "@/hooks/use-mobile";
 
-export default function Project({
-  params,
-}: {
-  params: Promise<{ pid: string }>;
-}) {
+// IMPORTA MODAIS NOVOS
+import PresetsPanel from "@/components/presets/PresetsPanel";
+//import AIPanel from "@/components/assistant/AIPanel";
+//import ShareModal from "@/components/share/ShareModal";
+
+export default function Project({ params }: { params: Promise<{ pid: string }> }) {
   const resolvedParams = use(params);
   const session = useSession();
   const { pid } = resolvedParams;
+
   const project = useGetProject(session.user._id, pid, session.token);
   const downloadProjectImages = useDownloadProject();
   const processProject = useProcessProject();
@@ -47,13 +49,22 @@ export default function Project({
   const { toast } = useToast();
   const socket = useGetSocket(session.token);
   const searchParams = useSearchParams();
+
   const view = searchParams.get("view") ?? "grid";
   const mode = searchParams.get("mode") ?? "edit";
+
   const router = useRouter();
   const path = usePathname();
   const sidebar = useSidebar();
   const isMobile = useIsMobile();
+
   const [currentImage, setCurrentImage] = useState<ProjectImage | null>(null);
+
+  // NOVOS STATES PARA FUNCIONALIDADES FASE 3
+  const [showPresets, setShowPresets] = useState(false);
+  const [showAIPanel, setShowAIPanel] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
+
   const [processing, setProcessing] = useState<boolean>(false);
   const [processingProgress, setProcessingProgress] = useState<number>(0);
   const [processingSteps, setProcessingSteps] = useState<number>(1);
@@ -61,11 +72,7 @@ export default function Project({
 
   const totalProcessingSteps =
     (project.data?.tools.length ?? 0) * (project.data?.imgs.length ?? 0);
-  const projectResults = useGetProjectResults(
-    session.user._id,
-    pid,
-    session.token,
-  );
+  const projectResults = useGetProjectResults(session.user._id, pid, session.token);
   const qc = useQueryClient();
 
   useLayoutEffect(() => {
@@ -80,13 +87,12 @@ export default function Project({
   useEffect(() => {
     function onProcessUpdate() {
       setProcessingSteps((prev) => prev + 1);
-
       const progress = Math.min(
         Math.round((processingSteps * 100) / totalProcessingSteps),
         100,
       );
-
       setProcessingProgress(progress);
+
       if (processingSteps >= totalProcessingSteps) {
         setTimeout(() => {
           projectResults.refetch().then(() => {
@@ -129,10 +135,7 @@ export default function Project({
   if (project.isError)
     return (
       <div className="flex size-full justify-center items-center h-screen p-8">
-        <Alert
-          variant="destructive"
-          className="w-fit max-w-[40rem] text-wrap truncate"
-        >
+        <Alert variant="destructive" className="w-fit max-w-[40rem] text-wrap">
           <OctagonAlert className="size-4" />
           <AlertTitle>{project.error.name}</AlertTitle>
           <AlertDescription>{project.error.message}</AlertDescription>
@@ -152,6 +155,27 @@ export default function Project({
       </div>
     );
 
+  // ============================
+  //  UNDO & RESET HANDLERS
+  // ============================
+  const handleUndo = async () => {
+    if (!currentImage) return;
+    await fetch(`/api/projects/${pid}/images/${currentImage._id}/undo`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${session.token}` },
+    });
+    project.refetch();
+  };
+
+  const handleReset = async () => {
+    if (!currentImage) return;
+    await fetch(`/api/projects/${pid}/images/${currentImage._id}/reset`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${session.token}` },
+    });
+    project.refetch();
+  };
+
   return (
     <ProjectProvider
       project={project.data}
@@ -159,20 +183,22 @@ export default function Project({
       preview={{ waiting: waitingForPreview, setWaiting: setWaitingForPreview }}
     >
       <div className="flex flex-col h-screen relative">
+        
         {/* Header */}
         <div className="flex flex-col xl:flex-row justify-center items-start xl:items-center xl:justify-between border-b border-sidebar-border py-2 px-2 md:px-3 xl:px-4 h-fit gap-2">
           <div className="flex items-center justify-between w-full xl:w-auto gap-2">
-            <h1 className="text-lg font-semibold truncate">
-              {project.data.name}
-            </h1>
+            <h1 className="text-lg font-semibold truncate">{project.data.name}</h1>
             <div className="flex items-center gap-2 xl:hidden">
               <ViewToggle />
               <ModeToggle />
             </div>
           </div>
+          
           <div className="flex items-center justify-between w-full xl:w-auto gap-2">
             <SidebarTrigger variant="outline" className="h-9 w-10 lg:hidden" />
             <div className="flex items-center gap-2 flex-wrap justify-end xl:justify-normal w-full xl:w-auto">
+              
+              {/* Apply Button */}
               {mode !== "results" && (
                 <>
                   <Button
@@ -207,6 +233,8 @@ export default function Project({
                   <AddImagesDialog />
                 </>
               )}
+
+              {/* Download */}
               <Button
                 variant="outline"
                 className="px-3"
@@ -241,22 +269,70 @@ export default function Project({
                   <Download />
                 )}
               </Button>
+
               <div className="hidden xl:flex items-center gap-2">
                 <ViewToggle />
                 <ModeToggle />
               </div>
+
             </div>
           </div>
         </div>
-        {/* Main Content */}
+
+        {/* MAIN CONTENT */}
         <div className="h-full overflow-x-hidden flex">
-          {mode !== "results" && <Toolbar />}
+          
+          {/* TOOLBAR WITH NEW BUTTONS */}
+          {mode !== "results" && (
+            <Toolbar
+              onOpenPresets={() => setShowPresets(true)}
+              onOpenAIAssistant={() => setShowAIPanel(true)}
+              onShareProject={() => setShowShareModal(true)}
+              onUndo={handleUndo}
+              onReset={handleReset}
+            />
+
+          )}
+
           <ProjectImageList
             setCurrentImageId={setCurrentImage}
             results={projectResults.data}
           />
         </div>
       </div>
+
+      
+      {/*PRESETS PANEL*/}
+      {showPresets && (
+        <PresetsPanel
+          project={project.data}
+          token={session.token}
+          onClose={() => setShowPresets(false)}
+          //onApplyPreset={(p) => console.log("preset params:", p)}
+        />
+      )}
+      {/*
+      // AI PANEL
+      {showAIPanel && (
+        <AIPanel
+          project={project.data}
+          token={session.token}
+          onClose={() => setShowAIPanel(false)}
+        />
+      )}
+
+      // SHARE MODAL
+      {showShareModal && (
+        <ShareModal
+          pid={project.data._id}
+          token={session.token}
+          onClose={() => setShowShareModal(false)}
+        />
+      )}
+        */}
+      
+
+      {/* PROCESSING OVERLAY */}
       <Transition
         show={processing}
         enter="transition-opacity ease-in duration-300"
@@ -276,6 +352,7 @@ export default function Project({
           </Card>
         </div>
       </Transition>
+
     </ProjectProvider>
   );
 }

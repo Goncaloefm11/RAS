@@ -27,10 +27,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "../ui/dialog";
-import { Eraser } from "lucide-react";
+import { Eraser, Wand2 } from "lucide-react"; // ⬅️ IMPORTA O ÍCONE DO PRESETS
 import { useState } from "react";
 
-export function Toolbar() {
+export function Toolbar({
+  onOpenPresets,
+  onOpenAIAssistant,
+  onShareProject,
+  onUndo,
+  onReset,
+}: any) {
   const searchParams = useSearchParams();
   const view = searchParams.get("view") ?? "grid";
   const disabled = view === "grid";
@@ -48,7 +54,19 @@ export function Toolbar() {
   return (
     <div className="flex h-full w-14 flex-col justify-between items-center border-r bg-background p-2">
       <div className="flex flex-col gap-2">
+
         <span className="text-sm text-gray-500">Tools</span>
+
+        {/* 🔥 BOTÃO DE PRESETS */}
+        <Button
+          variant="outline"
+          className="size-10"
+          onClick={onOpenPresets}
+        >
+          <Wand2 />
+        </Button>
+
+        {/* RESTO DOS TOOLS */}
         <BrightnessTool disabled={disabled} />
         <ContrastTool disabled={disabled} />
         <SaturationTool disabled={disabled} />
@@ -64,7 +82,30 @@ export function Toolbar() {
         <PeopleAITool disabled={disabled} />
         <TextAITool disabled={disabled} />
         <UpgradeAITool disabled={disabled} />
+
+        {/* --- EXTRA BUTTONS (UNDO / RESET) --- */}
+        {onUndo && (
+          <Button
+            variant="outline"
+            className="size-10"
+            onClick={onUndo}
+          >
+            Undo
+          </Button>
+        )}
+
+        {onReset && (
+          <Button
+            variant="outline"
+            className="size-10"
+            onClick={onReset}
+          >
+            Reset
+          </Button>
+        )}
       </div>
+
+      {/* CLEAR ALL TOOLS */}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogTrigger asChild>
           <Button

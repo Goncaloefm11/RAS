@@ -1077,4 +1077,66 @@ router.delete("/:user/:project/tool/:tool", (req, res, next) => {
     .catch((_) => res.status(501).jsonp(`Error acquiring user's project`));
 });
 
+// Apply a preset (adds multiple tools at once)
+router.post("/:user/:project/preset", async (req, res, next) => {
+  const { preset } = req.body;
+
+  if (!preset) {
+    return res.status(400).jsonp("Missing preset name.");
+  }
+
+  // PRESETS DEFINIDOS
+  const presets = {
+    boost: [
+      { procedure: "saturation", params: { value: 20 } },
+      { procedure: "brightness", params: { value: 15 } },
+      { procedure: "contrast", params: { value: 15 } },
+    ],
+    bw: [
+      { procedure: "binarization", params: { threshold: 128 } },
+      { procedure: "contrast", params: { value: 20 } },
+    ],
+    vintage: [
+      { procedure: "saturation", params: { value: -20 } },
+      { procedure: "brightness", params: { value: 10 } },
+      { procedure: "contrast", params: { value: 5 } },
+    ],
+    highdetail: [
+      { procedure: "contrast", params: { value: 25 } },
+      { procedure: "sharpen", params: { value: 30 } },
+    ],
+  };
+
+  if (!presets[preset]) {
+    return res.status(404).jsonp("Unknown preset.");
+  }
+
+  try {
+    const project = await Project.getOne(req.params.user, req.params.project);
+
+    const toolsToAdd = presets[preset];
+
+    // ADICIONAR TOOLS COM A MESMA LÓGICA DO ENDPOINT ORIGINAL
+    for (let t of toolsToAdd) {
+      project.tools.push({
+        position: project.tools.length,
+        procedure: t.procedure,
+        params: t.params,
+      });
+    }
+
+    await Project.update(req.params.user, req.params.project, project);
+
+    res.status(200).jsonp({
+      message: `Preset '${preset}' applied.`,
+      added: toolsToAdd.length,
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).jsonp("Error applying preset.");
+  }
+});
+
+
 module.exports = { router, process_msg };
